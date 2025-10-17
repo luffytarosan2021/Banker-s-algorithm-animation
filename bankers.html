@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Banker's Algorithm Animation with Execution Visualization</title>
+<style>
+    :root {
+        --bg-color: #f8f9fa;
+        --text-color: #333;
+        --primary-color: #007bff;
+        --safe-color: #28a745;
+        --unsafe-color: #dc3545;
+        --highlight-bg-calc: #000;
+        --highlight-text-calc: #fff;
+        --highlight-bg-check: #fffbe6;
+        --available-border: #17a2b8;
+    }
+
+    body {
+        margin: 0;
+        padding: 20px;
+        font-family: "Segoe UI", sans-serif;
+        background: var(--bg-color);
+        color: var(--text-color);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+
+    h1 {
+        color: var(--primary-color);
+        margin-bottom: 15px;
+    }
+
+    #caption-bar {
+        background: #e9ecef;
+        padding: 10px 15px;
+        border-radius: 5px;
+        text-align: center;
+        font-size: 1.2em;
+        min-height: 35px;
+        transition: opacity 0.5s;
+        opacity: 0;
+        margin-bottom: 20px;
+    }
+
+    #available-display {
+        border: 2px solid var(--available-border);
+        background: #fff;
+        padding: 8px;
+        border-radius: 5px;
+        font-weight: 600;
+        margin-bottom: 15px;
+        text-align: center;
+    }
+
+    table {
+        border-collapse: collapse;
+        width: 100%;
+        max-width: 1000px;
+        margin-bottom: 20px;
+    }
+    th, td {
+        border: 1px solid #ccc;
+        padding: 8px;
+        text-align: center;
+        transition: background 0.3s, color 0.3s;
+    }
+    th {
+        background: var(--primary-color);
+        color: #fff;
+    }
+
+    .highlight-calc {
+        background: var(--highlight-bg-calc);
+        color: var(--highlight-text-calc);
+        font-weight: bold;
+    }
+
+    .highlight-check {
+        background: var(--highlight-bg-check);
+        color: var(--unsafe-color);
+        font-weight: bold;
+    }
+
+    .available-cell {
+        background: #e6f7ff;
+    }
+
+    .status-safe { color: var(--safe-color); font-weight: bold; }
+    .status-unsafe { color: var(--unsafe-color); font-weight: bold; }
+
+    #start-btn, #visualize-btn {
+        background: var(--primary-color);
+        color: white;
+        border: none;
+        border-radius: 5px;
+        padding: 10px 20px;
+        font-size: 1em;
+        font-weight: 600;
+        cursor: pointer;
+        margin-bottom: 20px;
+        transition: background 0.3s ease, transform 0.2s ease;
+    }
+
+    #start-btn:hover, #visualize-btn:hover {
+        background: #0056b3;
+        transform: scale(1.05);
+    }
+
+    #start-btn:disabled, #visualize-btn:disabled {
+        background: gray;
+        cursor: not-allowed;
+        transform: none;
+    }
+
+    .viz-section {
+        display: flex;
+        gap: 20px;
+        margin-top: 20px;
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+
+    .viz-table {
+        border-collapse: collapse;
+        width: 220px;
+        text-align: center;
+    }
+    .viz-table th, .viz-table td {
+        border: 1px solid #ccc;
+        padding: 6px;
+    }
+    .ready { background: #ffc107; }
+    .waiting { background: #fd7e14; color: #fff; }
+    .running { background: #0dcaf0; color: #fff; }
+    .executed { background: #198754; color: #fff; }
+</style>
+</head>
+<body>
+
+<h1>Banker's Algorithm Animation</h1>
+
+<button id="start-btn">Start Simulation</button>
+<div id="caption-bar">Click Start to begin the animation.</div>
+<div id="available-display">
+    Available Resources [A, B, C]: <span id="available-values">...</span>
+</div>
+
+<!-- Original Banker’s Algorithm Table -->
+<table>
+    <thead>
+        <tr>
+            <th rowspan="2">Process</th>
+            <th colspan="3">Max</th>
+            <th colspan="3">Allocation</th>
+            <th colspan="3">Need</th>
+            <th colspan="3">Available</th>
+            <th rowspan="2">Status</th>
+        </tr>
+        <tr>
+            <th>A</th><th>B</th><th>C</th>
+            <th>A</th><th>B</th><th>C</th>
+            <th>A</th><th>B</th><th>C</th>
+            <th>A</th><th>B</th><th>C</th>
+        </tr>
+    </thead>
+    <tbody id="process-table-body"></tbody>
+</table>
+
+<!-- Visualization Section -->
+<button id="visualize-btn">Visualize Execution</button>
+<div class="viz-section">
+    <table class="viz-table">
+        <thead><tr><th colspan="2">Ready Queue</th></tr></thead>
+        <tbody id="ready-table"></tbody>
+    </table>
+    <table class="viz-table">
+        <thead><tr><th colspan="2">Waiting</th></tr></thead>
+        <tbody id="waiting-table"></tbody>
+    </table>
+    <table class="viz-table">
+        <thead><tr><th colspan="2">Running</th></tr></thead>
+        <tbody id="running-table"></tbody>
+    </table>
+    <table class="viz-table">
+        <thead><tr><th colspan="2">Executed</th></tr></thead>
+        <tbody id="executed-table"></tbody>
+    </table>
+</div>
+
+<script>
+// === Original Banker’s Algorithm Code (unchanged) ===
+const initialData = {
+    processes: [
+        { id: 'P0', max: [7, 5, 3], allocation: [0, 1, 0] },
+        { id: 'P1', max: [3, 2, 2], allocation: [2, 0, 0] },
+        { id: 'P2', max: [9, 0, 2], allocation: [3, 0, 2] },
+        { id: 'P3', max: [2, 2, 2], allocation: [2, 1, 1] },
+        { id: 'P4', max: [4, 3, 3], allocation: [0, 0, 2] }
+    ],
+    available: [3, 3, 2]
+};
+
+let currentAvailable = [...initialData.available];
+let processState = initialData.processes.map(p => ({
+    ...p,
+    need: p.max.map((m,i)=>m - p.allocation[i]),
+    status: 'Pending'
+}));
+
+const tableBody = document.getElementById('process-table-body');
+const captionBar = document.getElementById('caption-bar');
+const availableDisplay = document.getElementById('available-values');
+const startBtn = document.getElementById('start-btn');
+const visualizeBtn = document.getElementById('visualize-btn');
+const STEP_DELAY = 2500;
+
+function delay(ms = STEP_DELAY){ return new Promise(r=>setTimeout(r, ms)); }
+
+function renderTable(showAvailable = true){
+    availableDisplay.textContent = `[${currentAvailable.join(', ')}]`;
+    tableBody.innerHTML = '';
+    processState.forEach(p=>{
+        const row = tableBody.insertRow();
+        row.id = `row-${p.id}`;
+        row.insertCell().textContent = p.id;
+        p.max.forEach(v=>row.insertCell().textContent=v);
+        p.allocation.forEach(v=>row.insertCell().textContent=v);
+        p.need.forEach(v=>row.insertCell().textContent=v);
+        currentAvailable.forEach(v=>{
+            const c = row.insertCell();
+            c.textContent = showAvailable?v:'';
+            if(showAvailable)c.classList.add('available-cell');
+        });
+        const s = row.insertCell();
+        s.textContent = p.status;
+        if(p.status==='Safe') s.classList.add('status-safe');
+        else if(p.status==='Unsafe') s.classList.add('status-unsafe');
+    });
+}
+
+async function updateCaption(msg){
+    captionBar.style.opacity=0;
+    await delay(400);
+    captionBar.textContent=msg;
+    captionBar.style.opacity=1;
+}
+
+function highlightCells(rowId, cols, cls){
+    const row=document.getElementById(rowId);
+    cols.forEach(i=>row.cells[i].classList.add(cls));
+}
+function unhighlightCells(rowId, cols, cls){
+    const row=document.getElementById(rowId);
+    cols.forEach(i=>row.cells[i].classList.remove(cls));
+}
+
+function canRun(need, available){ return need.every((n,i)=>n<=available[i]); }
+function updateAvailable(avail, alloc){ return avail.map((a,i)=>a+alloc[i]); }
+
+async function runAnimation(){
+    startBtn.disabled=true;
+    renderTable(false);
+    await updateCaption("Let's start by calculating the Need for each process.");
+    // Need Calculation Phase
+    for(let p of processState){
+        for(let i=0;i<3;i++){
+            const rowId=`row-${p.id}`;
+            highlightCells(rowId,[1+i,4+i,7+i],'highlight-calc');
+            await updateCaption(`Calculating Need for ${p.id}: ${p.max[i]} - ${p.allocation[i]} = ${p.need[i]}`);
+            await delay(1500);
+            unhighlightCells(rowId,[1+i,4+i,7+i],'highlight-calc');
+        }
+    }
+    await updateCaption("Need matrix is ready. Let's start checking which processes can safely run.");
+    await delay(2000);
+
+    let safeSeq=[];
+    let available=[...initialData.available];
+    renderTable(true);
+
+    for(let attempt=0;attempt<processState.length*2;attempt++){
+        let found=false;
+        for(let p of processState){
+            if(p.status==='Pending' && canRun(p.need, available)){
+                const rowId=`row-${p.id}`;
+                highlightCells(rowId,[7,8,9,10,11,12],'highlight-check');
+                await updateCaption(`Checking ${p.id}: Need ${p.need.join(', ')} <= Available ${available.join(', ')}`);
+                await delay(1500);
+                unhighlightCells(rowId,[7,8,9,10,11,12],'highlight-check');
+
+                await updateCaption(`${p.id} can run safely. Resources released.`);
+                available=updateAvailable(available,p.allocation);
+                currentAvailable=[...available];
+                p.status='Safe';
+                safeSeq.push(p.id);
+                renderTable(true);
+                await delay(1500);
+                found=true;
+                break;
+            }
+        }
+        if(!found) break;
+    }
+
+    const allSafe = safeSeq.length===processState.length;
+    if(allSafe) await updateCaption(`All processes finished safely. Safe sequence: ${safeSeq.join(' → ')}`);
+    else await updateCaption(`Deadlock detected. System is unsafe.`);
+
+    // Save safe sequence for visualization
+    visualizeBtn.dataset.sequence = safeSeq.join(',');
+}
+startBtn.addEventListener('click', ()=>{ runAnimation(); });
+
+// === Visualization Section ===
+const readyTable=document.getElementById('ready-table');
+const waitingTable=document.getElementById('waiting-table');
+const runningTable=document.getElementById('running-table');
+const executedTable=document.getElementById('executed-table');
+
+function addRow(table, id, cls){
+    const row=table.insertRow();
+    row.id=`viz-${id}`;
+    const c1=row.insertCell(); c1.textContent=id;
+    const c2=row.insertCell(); c2.textContent=id;
+    row.className=cls;
+}
+
+function clearVizTables(){
+    [readyTable,waitingTable,runningTable,executedTable].forEach(t=>t.innerHTML='');
+}
+
+async function visualizeExecution(){
+    const seq=(visualizeBtn.dataset.sequence||'').split(',');
+    if(seq.length===0){ alert('Run simulation first!'); return; }
+
+    clearVizTables();
+
+    // Initialize ready queue
+    seq.forEach(id=>addRow(readyTable,id,'ready'));
+
+    for(const id of seq){
+        // Move Ready -> Waiting
+        const row=document.getElementById(`viz-${id}`);
+        readyTable.removeChild(row);
+        waitingTable.appendChild(row);
+        row.className='waiting';
+        await delay(1000);
+
+        // Move Waiting -> Running
+        waitingTable.removeChild(row);
+        runningTable.appendChild(row);
+        row.className='running';
+        await delay(2000);
+
+        // Move Running -> Executed
+        runningTable.removeChild(row);
+        executedTable.appendChild(row);
+        row.className='executed';
+        await delay(1000);
+    }
+    await updateCaption('Visualization completed.');
+}
+
+visualizeBtn.addEventListener('click', visualizeExecution);
+</script>
+</body>
+</html>
