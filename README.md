@@ -1,6 +1,6 @@
 #  Banker's Algorithm
 
-A C/C++ implementation of the **Banker’s Algorithm**, a classic **deadlock avoidance** algorithm used in operating systems.  
+An animation of the **Banker’s Algorithm**, a classic **deadlock avoidance** algorithm used in operating systems.  
 It helps determine whether a system is in a **safe state** by simulating resource allocation for multiple processes.
 
 ---
